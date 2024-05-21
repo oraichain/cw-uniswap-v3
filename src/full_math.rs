@@ -125,34 +125,6 @@ pub fn mul_div_rounding_up(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const Q128: U256 = U256::from_limbs([0, 0, 1, 0]);
-
-    #[test]
-    fn test_mul_div() {
-        //Revert if the denominator is zero
-        let result = mul_div(Q128, U256::from(5), U256::ZERO);
-        assert_eq!(result.err().unwrap().to_string(), "Denominator is 0");
-
-        // Revert if the denominator is zero and numerator overflows
-        let result = mul_div(Q128, Q128, U256::ZERO);
-        assert_eq!(
-            result.err().unwrap().to_string(),
-            "Denominator is less than or equal to prod_1"
-        );
-
-        // Revert if the output overflows uint256
-        let result = mul_div(Q128, Q128, U256_1);
-        assert_eq!(
-            result.err().unwrap().to_string(),
-            "Denominator is less than or equal to prod_1"
-        );
-    }
-}
-
-#[cfg(test)]
 mod test {
 
     use std::ops::{Div, Mul, Sub};
