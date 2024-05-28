@@ -1,26 +1,22 @@
 use crate::error::UniswapV3MathError;
 use crate::liquidity_math;
 use crate::swap_math;
+use crate::tick::Tick;
 use crate::tick_bitmap;
 use crate::tick_math;
 use alloy::primitives::{I256, U256};
 use std::collections::HashMap;
 
-pub struct TickInfo {
-    pub index: i32,
-    // liquidity gross
-    pub l_gross: u128,
-    // liquidity net
-    pub l_net: i128,
-}
-
-// 代表pool的当前状况
+// the current state of the pool
 pub struct Slot0 {
+    // the current price
     pub sqrt_price: U256,
     pub liquidity: u128,
+    // the current tick
     pub tick: i32,
 }
 
+#[derive(Debug)]
 pub struct SwapResult {
     pub amount0_delta: I256,
     pub amount1_delta: I256,
@@ -29,6 +25,7 @@ pub struct SwapResult {
     pub tick_after: i32,
 }
 
+// the top level state of the swap, the results of which are recorded in storage at the end
 struct SwapState {
     amount_specified_remaining: I256,
     amount_calculated: I256,
@@ -49,7 +46,7 @@ struct StepComputations {
 }
 
 pub fn swap(
-    ticks: &HashMap<i32, TickInfo>,
+    ticks: &HashMap<i32, Tick>,
     tick_bitmap: &HashMap<i16, U256>,
     tick_spacing: i32,
     zero_for_one: bool,
@@ -97,11 +94,11 @@ pub fn swap(
         }
         step.sqrt_price_next_x96 = tick_math::get_sqrt_ratio_at_tick(step.tick_next)?;
         let hit_to_limit = if zero_for_one {
-            // 卖出
-            step.sqrt_price_next_x96 < sqrt_price_limit // 下一个tick的价格比limit低
+            // sell
+            step.sqrt_price_next_x96 < sqrt_price_limit // The price of the next tick is lower than the limit
         } else {
-            // 买入
-            step.sqrt_price_next_x96 > sqrt_price_limit // 下一个tick的价格比limit高
+            // buy
+            step.sqrt_price_next_x96 > sqrt_price_limit // The price of the next tick is higher than the limit
         };
         let target_price = if hit_to_limit {
             sqrt_price_limit
@@ -131,11 +128,11 @@ pub fn swap(
             state.amount_calculated =
                 state.amount_calculated + I256::from_raw(step.amount_in + step.fee_amount);
         }
-        // 不计算protocol fee
+        // Do not calculate protocol fee
         if state.sqrt_price_x96 == step.sqrt_price_next_x96 {
             if step.initialized {
-                // initialized tick一定存在于ticks里
-                let mut l_net = ticks.get(&step.tick_next).unwrap().l_net;
+                // The initialized tick must exist in ticks
+                let mut l_net = ticks.get(&step.tick_next).unwrap().liquidity_net;
                 if zero_for_one {
                     l_net = -1 * l_net;
                 }
@@ -170,10 +167,14 @@ pub fn swap(
 
 #[cfg(test)]
 mod test {
-    use super::swap;
-    use crate::tick_bitmap::{flip_tick, next_initialized_tick_within_one_word};
-    use alloy::primitives::U256;
-    use std::{collections::HashMap, vec};
+    use super::{swap, Tick};
+    use crate::{
+        swap::Slot0,
+        tick_bitmap::{flip_tick, next_initialized_tick_within_one_word},
+        tick_math,
+    };
+    use alloy::primitives::{I256, U256};
+    use std::{collections::HashMap, str::FromStr, vec};
 
     pub fn init_test_ticks() -> eyre::Result<HashMap<i16, U256>> {
         let test_ticks = vec![-200, -55, -4, 70, 78, 84, 139, 240, 535];
@@ -186,14 +187,49 @@ mod test {
 
     #[test]
     pub fn test_swap() -> eyre::Result<()> {
-        let mut tick_bitmap = init_test_ticks()?;
+        let tick_bitmap = init_test_ticks()?;
         //returns tick to right if at initialized tick
         let (next, initialized) =
             next_initialized_tick_within_one_word(&tick_bitmap, 78, 1, false)?;
         assert_eq!(next, 84);
         assert_eq!(initialized, true);
 
-        // swap();
+        let mut ticks: HashMap<i32, Tick> = HashMap::new();
+        ticks.insert(
+            1,
+            Tick {
+                liquidity_gross: 0,
+                liquidity_net: 0,
+                fee_growth_outside_0_x_128: U256::from(2),
+                fee_growth_outside_1_x_128: U256::from(3),
+                tick_cumulative_outside: U256::ZERO,
+                seconds_per_liquidity_outside_x_128: U256::ZERO,
+                seconds_outside: 9,
+                initialized,
+            },
+        );
+
+        let sqrt_price_limit = tick_math::MIN_SQRT_RATIO.wrapping_add(U256::from(1));
+
+        let slot0 = &Slot0 {
+            sqrt_price: sqrt_price_limit.wrapping_add(U256::from(1)),
+            liquidity: 2_000_000u128,
+            // the current tick
+            tick: 1,
+        };
+
+        let swap_result = swap(
+            &ticks,
+            &tick_bitmap,
+            1,
+            true,
+            I256::from_str("-1")?,
+            sqrt_price_limit,
+            &slot0,
+            0,
+        )?;
+
+        println!("{:?}", swap_result);
 
         Ok(())
     }
