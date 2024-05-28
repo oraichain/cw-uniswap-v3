@@ -1,1 +1,22 @@
+# macOS
+.DS_Store
+
+# Text file backups
+**/*.rs.bk
+
+# IDEs
+.idea/
+*.iml
+
+# Auto-gen
+.cargo-ok
+
+# Build results
 /target
+.scannerwork/
+clippy-report.json
+artifacts
+.env
+
+# nodejs
+node_modules
