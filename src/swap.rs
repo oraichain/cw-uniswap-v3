@@ -174,7 +174,7 @@ mod test {
         tick_math,
     };
     use alloy::primitives::{I256, U256};
-    use std::{collections::HashMap, str::FromStr, vec};
+    use std::{collections::HashMap, vec};
 
     pub fn init_test_ticks() -> eyre::Result<HashMap<i16, U256>> {
         let test_ticks = vec![-200, -55, -4, 70, 78, 84, 139, 240, 535];
@@ -223,7 +223,7 @@ mod test {
             &tick_bitmap,
             1,
             true,
-            I256::from_str("-1")?,
+            I256::from_raw(U256::from(1_000_000)),
             sqrt_price_limit,
             &slot0,
             0,
