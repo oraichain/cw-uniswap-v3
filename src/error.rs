@@ -1,9 +1,12 @@
 use alloy::primitives::ruint::ParseError;
+use cosmwasm_std::StdError;
 use thiserror::Error;
 
 // TODO: make these errors better, some errors in univ3 libs are just require(condition) without a message.
 #[derive(Error, Debug)]
 pub enum UniswapV3MathError {
+    #[error("{0}")]
+    Std(#[from] StdError),
     #[error("Denominator is 0")]
     DenominatorIsZero,
     #[error("Result is U256::MAX")]
@@ -41,4 +44,12 @@ pub enum UniswapV3MathError {
     MiddlewareError(String),
     #[error("Parse error")]
     ParseError(#[from] ParseError),
+    #[error("SqrtPrice Lower Than Min")]
+    SplM,
+    #[error("SqrtPrice Lower Than Current")]
+    SplC,
+    #[error("SqrtPrice Upper Than Max")]
+    SpuM,
+    #[error("SqrtPrice Upper Than Current")]
+    SpuC,
 }
